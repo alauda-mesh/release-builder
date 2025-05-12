@@ -24,7 +24,8 @@ import (
 	"path/filepath"
 
 	"istio.io/istio/pkg/log"
-	"istio.io/release-builder/pkg/model"
+
+	"github.com/alauda-mesh/release-builder/pkg/model"
 )
 
 // Grafana publishes the grafana dashboards to grafana.com

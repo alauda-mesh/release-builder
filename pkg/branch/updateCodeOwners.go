@@ -20,8 +20,9 @@ import (
 	"strings"
 
 	"istio.io/istio/pkg/log"
-	"istio.io/release-builder/pkg/model"
-	"istio.io/release-builder/pkg/util"
+
+	"github.com/alauda-mesh/release-builder/pkg/model"
+	"github.com/alauda-mesh/release-builder/pkg/util"
 )
 
 // UpdateCodeOwners goes to each repo and updates CODEOWNERS to just be the

@@ -24,8 +24,9 @@ import (
 	"time"
 
 	"istio.io/istio/pkg/log"
-	"istio.io/release-builder/pkg/model"
-	"istio.io/release-builder/pkg/util"
+
+	"github.com/alauda-mesh/release-builder/pkg/model"
+	"github.com/alauda-mesh/release-builder/pkg/util"
 )
 
 // Structs for json data required

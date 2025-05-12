@@ -21,11 +21,11 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-
 	"istio.io/istio/pkg/log"
-	"istio.io/release-builder/pkg"
-	"istio.io/release-builder/pkg/model"
-	"istio.io/release-builder/pkg/util"
+
+	"github.com/alauda-mesh/release-builder/pkg"
+	"github.com/alauda-mesh/release-builder/pkg/model"
+	"github.com/alauda-mesh/release-builder/pkg/util"
 )
 
 var (
@@ -33,10 +33,10 @@ var (
 		release      string
 		dockerhub    string
 		dockertags   []string
-		gcsbucket    string
+		s3bucket     string
 		helmbucket   string
 		helmhub      string
-		gcsaliases   []string
+		s3alias      []string
 		github       string
 		githubtoken  string
 		grafanatoken string
@@ -73,14 +73,14 @@ func init() {
 		"The docker hub to push images to. Example: docker.io/istio.")
 	publishCmd.PersistentFlags().StringSliceVar(&flags.dockertags, "dockertags", flags.dockertags,
 		"The tags to apply to docker images. Example: latest")
-	publishCmd.PersistentFlags().StringVar(&flags.gcsbucket, "gcsbucket", flags.gcsbucket,
-		"The gcs bucket to publish binaries to. Example: istio-release/releases.")
+	publishCmd.PersistentFlags().StringVar(&flags.s3bucket, "s3bucket", flags.s3bucket,
+		"The S3 bucket to publish binaries to. Example: istio-release/releases.")
 	publishCmd.PersistentFlags().StringVar(&flags.helmbucket, "helmbucket", flags.helmbucket,
-		"The gcs bucket to publish helm to. Example: istio-release/charts.")
+		"The S3 bucket to publish helm to. Example: istio-release/charts.")
 	publishCmd.PersistentFlags().StringVar(&flags.helmhub, "helmhub", flags.helmhub,
 		"The oci registry to publish helm to. Example: gcr.io/istio-release/charts.")
-	publishCmd.PersistentFlags().StringSliceVar(&flags.gcsaliases, "gcsaliases", flags.gcsaliases,
-		"Alias to publish to gcs. Example: latest")
+	publishCmd.PersistentFlags().StringSliceVar(&flags.s3alias, "s3aliases", flags.s3alias,
+		"Alias to publish to S3. Example: latest")
 	publishCmd.PersistentFlags().StringVar(&flags.github, "github", flags.github,
 		"The Github org to trigger a release, and tag, for. Example: istio.")
 	publishCmd.PersistentFlags().StringVar(&flags.githubtoken, "githubtoken", flags.githubtoken,
@@ -108,9 +108,9 @@ func Publish(manifest model.Manifest) error {
 			return fmt.Errorf("failed to publish to docker: %v", err)
 		}
 	}
-	if flags.gcsbucket != "" {
-		if err := GcsArchive(manifest, flags.gcsbucket, flags.gcsaliases); err != nil {
-			return fmt.Errorf("failed to publish to gcs: %v", err)
+	if flags.s3bucket != "" {
+		if err := S3Archive(manifest, flags.s3bucket, flags.s3alias); err != nil {
+			return fmt.Errorf("failed to publish to S3: %v", err)
 		}
 	}
 	if flags.helmbucket != "" || flags.helmhub != "" {

@@ -29,10 +29,10 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/types"
-
 	"istio.io/istio/pkg/log"
-	"istio.io/release-builder/pkg/model"
-	"istio.io/release-builder/pkg/util"
+
+	"github.com/alauda-mesh/release-builder/pkg/model"
+	"github.com/alauda-mesh/release-builder/pkg/util"
 )
 
 // Image defines a single docker image. There are potentially many Image outputs for each .tar.gz - this

@@ -30,9 +30,9 @@ import (
 	"strings"
 
 	"golang.org/x/mod/modfile"
-
 	"istio.io/istio/pkg/log"
-	"istio.io/release-builder/pkg/model"
+
+	"github.com/alauda-mesh/release-builder/pkg/model"
 )
 
 // VerboseCommand runs a command, outputting stderr and stdout

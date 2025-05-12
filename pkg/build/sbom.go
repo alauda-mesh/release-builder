@@ -22,8 +22,9 @@ import (
 	"strings"
 
 	"istio.io/istio/pkg/log"
-	"istio.io/release-builder/pkg/model"
-	"istio.io/release-builder/pkg/util"
+
+	"github.com/alauda-mesh/release-builder/pkg/model"
+	"github.com/alauda-mesh/release-builder/pkg/util"
 )
 
 // Sbom generates Software Bill Of Materials for istio repo in an SPDX readable format.

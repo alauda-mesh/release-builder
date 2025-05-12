@@ -18,18 +18,18 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 
-	"cloud.google.com/go/storage"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"istio.io/istio/pkg/log"
 	"sigs.k8s.io/yaml"
 
-	"istio.io/istio/pkg/log"
-	"istio.io/release-builder/pkg/model"
-	"istio.io/release-builder/pkg/util"
+	"github.com/alauda-mesh/release-builder/pkg/model"
+	"github.com/alauda-mesh/release-builder/pkg/util"
 )
 
 // Any charts in any subdirs below the publish root that should also be published
@@ -56,7 +56,7 @@ func Helm(manifest model.Manifest, bucket string, hub string) error {
 
 func publishHelmIndex(manifest model.Manifest, bucket string) error {
 	ctx := context.Background()
-	client, err := NewGCSClient(ctx)
+	client, err := NewS3Client(ctx)
 	if err != nil {
 		return err
 	}
@@ -69,7 +69,6 @@ func publishHelmIndex(manifest model.Manifest, bucket string) error {
 	if len(splitbucket) > 1 {
 		objectPrefix = splitbucket[1]
 	}
-	bkt := client.Bucket(bucketName)
 
 	helmPublishRoot := filepath.Join(manifest.Directory, "helm")
 
@@ -79,7 +78,7 @@ func publishHelmIndex(manifest model.Manifest, bucket string) error {
 	// Note that `helm repo index` will index charts in subdirectories as well, which
 	// is desired behavior here - we will have to push them separately however,
 	// so the index matches the bucket contents.
-	err = MutateObject(helmPublishRoot, bkt, objectPrefix, "index.yaml", func() error {
+	err = MutateObject(helmPublishRoot, client, bucket, objectPrefix, "index.yaml", func() error {
 		dumpIndexFile(filepath.Join(helmPublishRoot, "index.yaml"), "before")
 		idxCmd := util.VerboseCommand("helm", "repo", "index", ".",
 			"--url", fmt.Sprintf("https://%s.storage.googleapis.com/%s", bucketName, objectPrefix),
@@ -97,7 +96,7 @@ func publishHelmIndex(manifest model.Manifest, bucket string) error {
 	}
 
 	// Add extra logging for the actual object in GCS to ensure its written correctly
-	liveObject, err := FetchObject(bkt, objectPrefix, "index.yaml")
+	liveObject, err := FetchObject(client, bucket, objectPrefix, "index.yaml")
 	if err != nil {
 		log.Warnf("failed to get live index.yaml: %v", err)
 	} else {
@@ -105,13 +104,13 @@ func publishHelmIndex(manifest model.Manifest, bucket string) error {
 	}
 
 	// Now push all the packaged charts in the helm root directory up
-	if err := publishHelmBucket(ctx, helmPublishRoot, objectPrefix, bucketName, bkt); err != nil {
+	if err := publishHelmBucket(ctx, helmPublishRoot, objectPrefix, bucketName, client); err != nil {
 		return err
 	}
 
 	// For any packaged charts in "chart subtype" subdirectories ("samples" etc), push those up
 	for _, chartType := range chartSubtypeDir {
-		if err := publishHelmBucket(ctx, filepath.Join(helmPublishRoot, chartType), path.Join(objectPrefix, chartType), bucketName, bkt); err != nil {
+		if err := publishHelmBucket(ctx, filepath.Join(helmPublishRoot, chartType), path.Join(objectPrefix, chartType), bucketName, client); err != nil {
 			return err
 		}
 	}
@@ -119,7 +118,7 @@ func publishHelmIndex(manifest model.Manifest, bucket string) error {
 	return nil
 }
 
-func publishHelmBucket(ctx context.Context, packagedChartOutputDir, publishPrefix, bName string, bkt *storage.BucketHandle) error {
+func publishHelmBucket(ctx context.Context, packagedChartOutputDir, publishPrefix, bName string, client *s3.Client) error {
 	dirInfo, err := os.ReadDir(packagedChartOutputDir)
 	if err != nil {
 		return err
@@ -130,20 +129,22 @@ func publishHelmBucket(ctx context.Context, packagedChartOutputDir, publishPrefi
 			continue
 		}
 		objName := path.Join(publishPrefix, f.Name())
-		obj := bkt.Object(objName)
-		w := obj.NewWriter(ctx)
 		f, err := os.Open(filepath.Join(packagedChartOutputDir, f.Name()))
 		if err != nil {
 			return fmt.Errorf("failed to open %v: %v", f.Name(), err)
 		}
-		r := bufio.NewReader(f)
-		if _, err := io.Copy(w, r); err != nil {
+
+		_, err = client.PutObject(ctx, &s3.PutObjectInput{
+			Bucket: aws.String(bName),
+			Key:    aws.String(objName),
+			Body:   bufio.NewReader(f),
+		})
+		_ = f.Close()
+		if err != nil {
 			return fmt.Errorf("failed writing %v: %v", f.Name(), err)
 		}
-		if err := w.Close(); err != nil {
-			return fmt.Errorf("failed to close bucket: %v", err)
-		}
-		log.Infof("Wrote %v to gs://%s/%s", f.Name(), bName, objName)
+
+		log.Infof("Wrote %v to s3://%s/%s", f.Name(), bName, objName)
 	}
 
 	return nil

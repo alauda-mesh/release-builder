@@ -18,7 +18,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-
 	"istio.io/istio/pkg/log"
 )
 

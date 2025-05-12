@@ -25,12 +25,12 @@ import (
 	"strconv"
 	"strings"
 
+	"istio.io/istio/pkg/log"
 	"sigs.k8s.io/yaml"
 
-	"istio.io/istio/pkg/log"
-	"istio.io/release-builder/pkg"
-	"istio.io/release-builder/pkg/model"
-	"istio.io/release-builder/pkg/util"
+	"github.com/alauda-mesh/release-builder/pkg"
+	"github.com/alauda-mesh/release-builder/pkg/model"
+	"github.com/alauda-mesh/release-builder/pkg/util"
 )
 
 func NewReleaseInfo(release string) ReleaseInfo {

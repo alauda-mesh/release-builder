@@ -20,11 +20,11 @@ import (
 	"path"
 	"strconv"
 
+	"istio.io/istio/pkg/log"
 	"sigs.k8s.io/yaml"
 
-	"istio.io/istio/pkg/log"
-	"istio.io/release-builder/pkg/model"
-	"istio.io/release-builder/pkg/util"
+	"github.com/alauda-mesh/release-builder/pkg/model"
+	"github.com/alauda-mesh/release-builder/pkg/util"
 )
 
 // Branch will run a specific automation step. Each step may include

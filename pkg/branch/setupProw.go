@@ -19,8 +19,9 @@ import (
 	"path"
 
 	"istio.io/istio/pkg/log"
-	"istio.io/release-builder/pkg/model"
-	"istio.io/release-builder/pkg/util"
+
+	"github.com/alauda-mesh/release-builder/pkg/model"
+	"github.com/alauda-mesh/release-builder/pkg/util"
 )
 
 // SetupProw goes to the test-infra repo and runs the commands to generate the

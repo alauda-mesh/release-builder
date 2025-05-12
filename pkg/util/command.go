@@ -19,10 +19,10 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+	"istio.io/istio/pkg/log"
 	"sigs.k8s.io/yaml"
 
-	"istio.io/istio/pkg/log"
-	"istio.io/release-builder/pkg/model"
+	"github.com/alauda-mesh/release-builder/pkg/model"
 )
 
 func StandardEnv(manifest model.Manifest) []string {
