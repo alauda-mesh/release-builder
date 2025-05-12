@@ -113,17 +113,14 @@ func Docker(manifest model.Manifest, hub string, tags []string, cosignkey string
 			return fmt.Errorf("failed to load docker image %v: %v", f.Name(), err)
 		}
 		imageName, variant, arch := getImageNameVariant(f.Name())
-		variants := []string{variant}
 		for _, tag := range tags {
-			for _, variant := range variants {
-				img := Image{
-					OriginalTag: fmt.Sprintf("%s/%s:%s", manifest.Docker, imageName, manifest.Version),
-					NewTag:      fmt.Sprintf("%s/%s:%s", hub, imageName, tag),
-					Variant:     variant,
-					Image:       imageName,
-				}
-				images[img] = append(images[img], arch)
+			img := Image{
+				OriginalTag: fmt.Sprintf("%s/%s:%s", manifest.Docker, imageName, manifest.Version),
+				NewTag:      fmt.Sprintf("%s/%s:%s", hub, imageName, tag),
+				Variant:     variant,
+				Image:       imageName,
 			}
+			images[img] = append(images[img], arch)
 		}
 	}
 
@@ -282,10 +279,6 @@ func getImageNameVariant(fname string) (name string, variant string, arch string
 	if match, _ := filepath.Match("*-arm64", imageName); match {
 		arch = "arm64"
 		imageName = strings.TrimSuffix(imageName, "-arm64")
-	}
-	if match, _ := filepath.Match("*-distroless", imageName); match {
-		variant = "distroless"
-		imageName = strings.TrimSuffix(imageName, "-distroless")
 	}
 	if match, _ := filepath.Match("*-debug", imageName); match {
 		variant = "debug"
