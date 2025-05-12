@@ -25,7 +25,7 @@ import (
 	"helm.sh/helm/v3/pkg/chart"
 	"sigs.k8s.io/yaml"
 
-	"istio.io/release-builder/pkg/model"
+	"github.com/alauda-mesh/release-builder/pkg/model"
 )
 
 func TestHelmUpdate(t *testing.T) {

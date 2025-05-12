@@ -19,8 +19,8 @@ import (
 	"path"
 	"strings"
 
-	"istio.io/release-builder/pkg/model"
-	"istio.io/release-builder/pkg/util"
+	"github.com/alauda-mesh/release-builder/pkg/model"
+	"github.com/alauda-mesh/release-builder/pkg/util"
 )
 
 // Rpm produces an rpm package just for the sidecar

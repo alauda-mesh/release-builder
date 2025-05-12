@@ -17,10 +17,10 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
-	"istio.io/release-builder/pkg/branch"
-	"istio.io/release-builder/pkg/build"
-	"istio.io/release-builder/pkg/publish"
-	"istio.io/release-builder/pkg/validate"
+	"github.com/alauda-mesh/release-builder/pkg/branch"
+	"github.com/alauda-mesh/release-builder/pkg/build"
+	"github.com/alauda-mesh/release-builder/pkg/publish"
+	"github.com/alauda-mesh/release-builder/pkg/validate"
 )
 
 // GetRootCmd returns the root of the cobra command-tree.

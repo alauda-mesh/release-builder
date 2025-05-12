@@ -205,10 +205,10 @@ formatters:
       sections:
         - standard
         - default
-        - prefix(istio.io/)
+        - prefix(github.com/alauda-mesh/)
     goimports:
       local-prefixes:
-        - istio.io/
+        - github.com/alauda-mesh/
   exclusions:
     generated: lax
     paths:

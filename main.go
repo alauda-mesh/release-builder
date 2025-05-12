@@ -17,7 +17,7 @@ package main
 import (
 	"os"
 
-	"istio.io/release-builder/pkg/cmd"
+	"github.com/alauda-mesh/release-builder/pkg/cmd"
 )
 
 func main() {

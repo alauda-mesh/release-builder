@@ -18,8 +18,9 @@ import (
 	"fmt"
 
 	"istio.io/istio/pkg/log"
-	"istio.io/release-builder/pkg/model"
-	"istio.io/release-builder/pkg/util"
+
+	"github.com/alauda-mesh/release-builder/pkg/model"
+	"github.com/alauda-mesh/release-builder/pkg/util"
 )
 
 // StopPublishingLatest stops prow from publishing the `latest` artifacts, leaving only

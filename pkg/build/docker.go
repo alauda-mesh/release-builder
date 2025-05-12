@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"path"
 
-	"istio.io/release-builder/pkg/model"
-	"istio.io/release-builder/pkg/util"
+	"github.com/alauda-mesh/release-builder/pkg/model"
+	"github.com/alauda-mesh/release-builder/pkg/util"
 )
 
 // Docker builds all docker images and outputs them as tar.gz files

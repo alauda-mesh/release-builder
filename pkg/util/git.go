@@ -28,9 +28,9 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/google/go-github/v35/github"
 	"golang.org/x/oauth2"
-
 	"istio.io/istio/pkg/log"
-	"istio.io/release-builder/pkg/model"
+
+	"github.com/alauda-mesh/release-builder/pkg/model"
 )
 
 // PushCommit will look for changes. If changes exist, it will create a branch and push a commit with the specified commit text

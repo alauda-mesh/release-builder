@@ -18,10 +18,10 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-
 	"istio.io/istio/pkg/log"
-	"istio.io/release-builder/pkg"
-	"istio.io/release-builder/pkg/util"
+
+	"github.com/alauda-mesh/release-builder/pkg"
+	"github.com/alauda-mesh/release-builder/pkg/util"
 )
 
 var (

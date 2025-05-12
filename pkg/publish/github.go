@@ -25,10 +25,10 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/google/go-github/v35/github"
 	"golang.org/x/oauth2"
-
 	"istio.io/istio/pkg/log"
-	"istio.io/release-builder/pkg/model"
-	"istio.io/release-builder/pkg/util"
+
+	"github.com/alauda-mesh/release-builder/pkg/model"
+	"github.com/alauda-mesh/release-builder/pkg/util"
 )
 
 var ptrue = true
