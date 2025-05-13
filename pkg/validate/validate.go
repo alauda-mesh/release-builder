@@ -272,7 +272,7 @@ type Version struct {
 }
 
 func TestProxyVersion(r ReleaseInfo) error {
-	archive := filepath.Join(r.release, "docker", "proxyv2-debug.tar.gz")
+	archive := filepath.Join(r.release, "docker", "proxyv2-distroless.tar.gz")
 	if err := util.VerboseCommand("docker", "load", "-i", archive).Run(); err != nil {
 		return fmt.Errorf("failed to load proxyv2-debug.tar.gz as docker image: %v", err)
 	}
