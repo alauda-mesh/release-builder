@@ -280,6 +280,10 @@ func getImageNameVariant(fname string) (name string, variant string, arch string
 		arch = "arm64"
 		imageName = strings.TrimSuffix(imageName, "-arm64")
 	}
+	if match, _ := filepath.Match("*-distroless", imageName); match {
+		variant = "distroless"
+		imageName = strings.TrimSuffix(imageName, "-distroless")
+	}
 	if match, _ := filepath.Match("*-debug", imageName); match {
 		variant = "debug"
 		imageName = strings.TrimSuffix(imageName, "-debug")
