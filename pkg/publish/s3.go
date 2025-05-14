@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/url"
 	"os"
 	"path"
@@ -72,11 +73,22 @@ func S3Archive(manifest model.Manifest, bucket string, aliases []string) error {
 	if len(splitbucket) > 1 {
 		objectPrefix = splitbucket[1]
 	}
-	if err := filepath.Walk(manifest.Directory, func(p string, info os.FileInfo, err error) error {
+	if err := filepath.WalkDir(manifest.Directory, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if info.IsDir() {
+
+		if d.IsDir() {
+			rel, err := filepath.Rel(manifest.Directory, p)
+			if err != nil {
+				return err
+			}
+
+			// Exclude "docker" directory under manifest directory
+			if rel == "docker" {
+				return filepath.SkipDir
+			}
+
 			return nil
 		}
 		objName := path.Join(objectPrefix, manifest.Version, strings.TrimPrefix(p, manifest.Directory))
