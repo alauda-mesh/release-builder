@@ -15,7 +15,6 @@
 package publish
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -25,22 +24,29 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"istio.io/istio/pkg/log"
 
 	"github.com/alauda-mesh/release-builder/pkg/model"
 )
 
-func NewS3Client(ctx context.Context) (*s3.Client, error) {
-	cfg, err := config.LoadDefaultConfig(ctx)
+func NewS3Client(ctx context.Context) (*minio.Client, error) {
+	endpoint := "https://s3.amazonaws.com"
+	if ep := os.Getenv("S3_ENDPOINT"); ep != "" {
+		endpoint = ep
+	}
+
+	useSSL := strings.HasPrefix(endpoint, "https://")
+	minioClient, err := minio.New(endpoint, &minio.Options{
+		Creds:  credentials.NewEnvAWS(),
+		Secure: useSSL,
+	})
 	if err != nil {
 		return nil, err
 	}
-	s3Client := s3.NewFromConfig(cfg)
-	return s3Client, nil
+
+	return minioClient, nil
 }
 
 // S3Archive publishes the final release archive to the given GCS bucket
@@ -69,17 +75,7 @@ func S3Archive(manifest model.Manifest, bucket string, aliases []string) error {
 		}
 		objName := path.Join(objectPrefix, manifest.Version, strings.TrimPrefix(p, manifest.Directory))
 
-		f, err := os.Open(p)
-		if err != nil {
-			return fmt.Errorf("failed to open %v: %v", p, err)
-		}
-		defer f.Close()
-
-		_, err = client.PutObject(ctx, &s3.PutObjectInput{
-			Bucket: aws.String(bucketName),
-			Key:    aws.String(objName),
-			Body:   bufio.NewReader(f),
-		})
+		_, err = client.FPutObject(ctx, bucketName, objName, p, minio.PutObjectOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to put object: %v", err)
 		}
@@ -93,11 +89,9 @@ func S3Archive(manifest model.Manifest, bucket string, aliases []string) error {
 	// Add alias objects. These are basically symlinks/tags for GCS, pointing to the latest version
 	for _, alias := range aliases {
 		objName := path.Join(objectPrefix, alias)
-		_, err = client.PutObject(ctx, &s3.PutObjectInput{
-			Bucket: aws.String(bucketName),
-			Key:    aws.String(objName),
-			Body:   strings.NewReader(manifest.Version),
-		})
+		_, err = client.PutObject(ctx, bucketName, objName,
+			strings.NewReader(manifest.Version), int64(len(manifest.Version)),
+			minio.PutObjectOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to write alias %v: %v", alias, err)
 		}
@@ -108,17 +102,14 @@ func S3Archive(manifest model.Manifest, bucket string, aliases []string) error {
 	return nil
 }
 
-func FetchObject(client *s3.Client, bucket string, objectPrefix string, filename string) ([]byte, error) {
+func FetchObject(client *minio.Client, bucket string, objectPrefix string, filename string) ([]byte, error) {
 	objName := filepath.Join(objectPrefix, filename)
-	getObjectResult, err := client.GetObject(context.Background(), &s3.GetObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(objName),
-	})
+	getObjectResult, err := client.GetObject(context.Background(), bucket, objName, minio.GetObjectOptions{})
 	if err != nil {
 		return nil, err
 	}
-	defer getObjectResult.Body.Close()
-	c, err := io.ReadAll(getObjectResult.Body)
+	defer getObjectResult.Close()
+	c, err := io.ReadAll(getObjectResult)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +118,7 @@ func FetchObject(client *s3.Client, bucket string, objectPrefix string, filename
 
 // MutateObject allows pulling a file from GCS, mutating it, then pushing it back up. This adds checks
 // to ensure that if the file is mutated in the meantime, the process is repeated.
-func MutateObject(outDir string, client *s3.Client, bucket string, objectPrefix string, filename string, f func() error) error {
+func MutateObject(outDir string, client *minio.Client, bucket string, objectPrefix string, filename string, f func() error) error {
 	for i := 0; i < 10; i++ {
 		err := mutateObjectInner(outDir, client, bucket, objectPrefix, filename, f)
 		if err == ErrIndexOutOfDate {
@@ -139,16 +130,12 @@ func MutateObject(outDir string, client *s3.Client, bucket string, objectPrefix 
 	return fmt.Errorf("max conflicts attempted")
 }
 
-func mutateObjectInner(outDir string, client *s3.Client, bucket string, objectPrefix string, filename string, f func() error) error {
+func mutateObjectInner(outDir string, client *minio.Client, bucket string, objectPrefix string, filename string, f func() error) error {
 	objName := filepath.Join(objectPrefix, filename)
 	outFile := filepath.Join(outDir, filename)
-	objResult, err := client.GetObject(context.Background(), &s3.GetObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(objName),
-	})
+	objResult, err := client.GetObject(context.Background(), bucket, objName, minio.GetObjectOptions{})
 	if err != nil {
-		var notFoundErr *types.NotFound
-		if errors.As(err, &notFoundErr) {
+		if minio.ToErrorResponse(err).Code == "NoSuchKey" {
 			// Missing is fine
 			log.Warnf("existing file %v does not exist", filename)
 		} else {
@@ -157,11 +144,8 @@ func mutateObjectInner(outDir string, client *s3.Client, bucket string, objectPr
 	}
 	etag := ""
 	if objResult != nil {
-		etag = aws.ToString(objResult.ETag)
-		log.Infof("Object %v currently has etag", objName, etag)
-
-		defer objResult.Body.Close()
-		idx, err := io.ReadAll(objResult.Body)
+		defer objResult.Close()
+		idx, err := io.ReadAll(objResult)
 		if err != nil {
 			return err
 		}
@@ -169,6 +153,10 @@ func mutateObjectInner(outDir string, client *s3.Client, bucket string, objectPr
 			return err
 		}
 		log.Infof("Wrote %v", outFile)
+
+		objInfo, _ := objResult.Stat()
+		etag = objInfo.ETag
+		log.Infof("Object %v currently has etag: %s", objName, etag)
 	}
 
 	// Run our action
@@ -177,26 +165,17 @@ func mutateObjectInner(outDir string, client *s3.Client, bucket string, objectPr
 	}
 
 	// Now we want to (try to) write it
-	res, err := os.Open(outFile)
-	if err != nil {
-		return fmt.Errorf("failed to open %v: %v", res.Name(), err)
-	}
-	defer res.Close()
-
-	pubObjectInput := &s3.PutObjectInput{
-		Bucket:       aws.String(bucket),
-		Key:          aws.String(objName),
-		Body:         bufio.NewReader(res),
-		CacheControl: aws.String("no-cache, max-age=0, no-transform"),
-		ContentType:  aws.String("text/yaml"),
+	pubObjectOptions := minio.PutObjectOptions{
+		CacheControl: "no-cache, max-age=0, no-transform",
+		ContentType:  "text/yaml",
 	}
 	if etag != "" {
-		pubObjectInput.IfMatch = aws.String(etag)
+		pubObjectOptions.SetMatchETag(etag)
 	}
 
-	_, err = client.PutObject(context.Background(), pubObjectInput)
+	_, err = client.FPutObject(context.Background(), bucket, objName, outFile, pubObjectOptions)
 	if err != nil {
-		return fmt.Errorf("failed writing %v: %v", res.Name(), err)
+		return fmt.Errorf("failed writing %v: %v", outFile, err)
 	}
 	return nil
 }

@@ -15,7 +15,6 @@
 package publish
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -23,8 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/minio/minio-go/v7"
 	"istio.io/istio/pkg/log"
 	"sigs.k8s.io/yaml"
 
@@ -118,7 +116,7 @@ func publishHelmIndex(manifest model.Manifest, bucket string) error {
 	return nil
 }
 
-func publishHelmBucket(ctx context.Context, packagedChartOutputDir, publishPrefix, bName string, client *s3.Client) error {
+func publishHelmBucket(ctx context.Context, packagedChartOutputDir, publishPrefix, bName string, client *minio.Client) error {
 	dirInfo, err := os.ReadDir(packagedChartOutputDir)
 	if err != nil {
 		return err
@@ -129,17 +127,9 @@ func publishHelmBucket(ctx context.Context, packagedChartOutputDir, publishPrefi
 			continue
 		}
 		objName := path.Join(publishPrefix, f.Name())
-		f, err := os.Open(filepath.Join(packagedChartOutputDir, f.Name()))
-		if err != nil {
-			return fmt.Errorf("failed to open %v: %v", f.Name(), err)
-		}
 
-		_, err = client.PutObject(ctx, &s3.PutObjectInput{
-			Bucket: aws.String(bName),
-			Key:    aws.String(objName),
-			Body:   bufio.NewReader(f),
-		})
-		_ = f.Close()
+		fileName := filepath.Join(packagedChartOutputDir, f.Name())
+		_, err = client.FPutObject(ctx, bName, objName, fileName, minio.PutObjectOptions{})
 		if err != nil {
 			return fmt.Errorf("failed writing %v: %v", f.Name(), err)
 		}
