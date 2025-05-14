@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -37,8 +38,13 @@ func NewS3Client(ctx context.Context) (*minio.Client, error) {
 		endpoint = ep
 	}
 
-	useSSL := strings.HasPrefix(endpoint, "https://")
-	minioClient, err := minio.New(endpoint, &minio.Options{
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	useSSL := u.Scheme == "https"
+	minioClient, err := minio.New(u.Host, &minio.Options{
 		Creds:  credentials.NewEnvAWS(),
 		Secure: useSSL,
 	})
