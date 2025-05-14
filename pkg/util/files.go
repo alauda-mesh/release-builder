@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path"
@@ -97,8 +98,8 @@ func CopyDirFiltered(src, dst string, include []string) error {
 	if err := CopyDir(src, dst); err != nil {
 		return err
 	}
-	if err := filepath.Walk(dst, func(path string, info os.FileInfo, err error) error {
-		if info.IsDir() {
+	if err := filepath.WalkDir(dst, func(path string, d fs.DirEntry, err error) error {
+		if d.IsDir() {
 			return nil
 		}
 		fname := filepath.Base(path)
@@ -279,7 +280,7 @@ func ZipFolder(source, target string) error {
 		baseDir = filepath.Base(source)
 	}
 
-	return filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
+	return filepath.WalkDir(source, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}

@@ -16,7 +16,7 @@ package build
 
 import (
 	"fmt"
-	"os"
+	"io/fs"
 	"path"
 	"path/filepath"
 	"strings"
@@ -41,14 +41,11 @@ func GenerateBillOfMaterials(manifest model.Manifest) error {
 	// construct all the docker image tarball names as bom currently cannot accept directory as input
 	dockerDir := path.Join(manifest.OutDir(), "docker")
 	dockerImages := []string{}
-	if err := filepath.Walk(dockerDir, func(path string, fi os.FileInfo, err error) error {
+	if err := filepath.WalkDir(dockerDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if fi == nil {
-			return fmt.Errorf("failed to get fileinfo for file at path %s", path)
-		}
-		if fi.IsDir() {
+		if d.IsDir() {
 			return nil
 		}
 		dockerImages = append(dockerImages, path)

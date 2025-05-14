@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -100,8 +101,8 @@ func CheckRelease(release string) ([]string, string, []error) {
 	if len(errors) > 0 {
 		sb.WriteString(fmt.Sprintf("Checks failed. Release info: %+v", r))
 		sb.WriteString("Files in release: \n")
-		_ = filepath.Walk(r.release,
-			func(path string, info os.FileInfo, err error) error {
+		_ = filepath.WalkDir(r.release,
+			func(path string, d fs.DirEntry, err error) error {
 				if err != nil {
 					return err
 				}
@@ -109,8 +110,8 @@ func CheckRelease(release string) ([]string, string, []error) {
 				return nil
 			})
 		sb.WriteString("\nFiles in archive: \n")
-		_ = filepath.Walk(r.archive,
-			func(path string, info os.FileInfo, err error) error {
+		_ = filepath.WalkDir(r.archive,
+			func(path string, d fs.DirEntry, err error) error {
 				if err != nil {
 					return err
 				}
