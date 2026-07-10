@@ -160,6 +160,10 @@ type InputManifest struct {
 type Manifest struct {
 	// Dependencies declares all git repositories used to build this release
 	Dependencies IstioDependencies `json:"dependencies"`
+	// SourceGit is the primary Istio source repository used to build the release artifacts.
+	SourceGit string `json:"sourceGit,omitempty"`
+	// SourceRefName is the primary Istio source ref name used to build the release artifacts.
+	SourceRefName string `json:"sourceRefName,omitempty"`
 	// Version specifies what version of Istio this release is
 	Version string `json:"version"`
 	// Docker specifies the docker hub to use in the helm charts.
