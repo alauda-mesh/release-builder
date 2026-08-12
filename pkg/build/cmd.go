@@ -49,8 +49,15 @@ var (
 			}
 
 			// Save these values as they are needed for git commits and PRs
-			savedIstioGit := inManifest.Dependencies.Get()["istio"].Git
-			savedIstioBranch := inManifest.Dependencies.Get()["istio"].Branch
+			savedIstioDep := inManifest.Dependencies.Get()["istio"]
+			savedIstioGit := savedIstioDep.Git
+			savedIstioBranch := savedIstioDep.Branch
+			savedIstioRef := savedIstioBranch
+			if savedIstioRef == "" {
+				savedIstioRef = savedIstioDep.Ref()
+			}
+			manifest.SourceGit = savedIstioGit
+			manifest.SourceRefName = savedIstioRef
 			log.Infof("Saved Istio git:\n%+v", savedIstioGit)
 			log.Infof("Saved Istio branch:\n%+v", savedIstioBranch)
 

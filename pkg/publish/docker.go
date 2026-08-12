@@ -35,6 +35,12 @@ import (
 	"github.com/alauda-mesh/release-builder/pkg/util"
 )
 
+const (
+	ociSourceLabel   = "org.opencontainers.image.source"
+	ociRevisionLabel = "org.opencontainers.image.revision"
+	ociRefNameLabel  = "org.opencontainers.image.ref.name"
+)
+
 // Image defines a single docker image. There are potentially many Image outputs for each .tar.gz - this
 // represents the fully expanded form.
 // Example:
@@ -82,6 +88,7 @@ func Docker(manifest model.Manifest, hub string, tags []string, cosignkey string
 	if len(tags) == 0 {
 		tags = []string{manifest.Version}
 	}
+	provenanceLabels := getProvenanceLabels(manifest)
 	dockerArchives, err := os.ReadDir(path.Join(manifest.Directory, "docker"))
 	if err != nil {
 		return fmt.Errorf("failed to read docker output of release: %v", err)
@@ -129,39 +136,42 @@ func Docker(manifest model.Manifest, hub string, tags []string, cosignkey string
 		// Split case for simple images (single arch) vs multi-arch manifests.
 		if len(archs) == 1 {
 			arch := archs[0]
-			// Single architecture. We just want to push directly
-			// Single arch, push directly
-			if err := util.VerboseCommand("docker", "tag", img.OriginalReference(arch), img.NewReference(arch)).Run(); err != nil {
-				return fmt.Errorf("failed to tag docker image %v->%v: %v", img.OriginalReference(arch), img.NewReference(arch), err)
+			// Single architecture. Load from the local daemon, add provenance labels, and push.
+			origTagRef, err := name.ParseReference(img.OriginalReference(arch))
+			if err != nil {
+				return fmt.Errorf("failed to parse %v: %v", img.OriginalReference(arch), err)
 			}
-
-			if err := util.VerboseCommand("docker", "push", img.NewReference(arch)).Run(); err != nil {
+			newTagRef, err := name.ParseReference(img.NewReference(arch))
+			if err != nil {
+				return fmt.Errorf("failed to parse %v: %v", img.NewReference(arch), err)
+			}
+			newImg, err := daemon.Image(origTagRef)
+			if err != nil {
+				return fmt.Errorf("failed to load %v: %v", img.OriginalReference(arch), err)
+			}
+			newImg, err = addProvenanceLabels(newImg, provenanceLabels)
+			if err != nil {
+				return fmt.Errorf("failed to add provenance labels to %v: %v", img.OriginalReference(arch), err)
+			}
+			if err := remote.Write(newTagRef, newImg, remote.WithAuthFromKeychain(authn.DefaultKeychain)); err != nil {
 				return fmt.Errorf("failed to push docker image %v: %v", img.NewReference(arch), err)
 			}
 
 			// Sign images *after* push -- cosign only works against real
 			// repositories (not valid against tarballs)
 			if cosignEnabled {
-				imgRef, err := name.ParseReference(img.NewReference(arch))
-				if err != nil {
-					return fmt.Errorf("failed to parse image reference %v: %v", img.NewReference(arch), err)
-				}
-				newImg, err := remote.Image(imgRef, remote.WithAuthFromKeychain(authn.DefaultKeychain))
-				if err != nil {
-					return fmt.Errorf("failed to load %v: %v", imgRef, err)
-				}
 				digest, err := newImg.Digest()
 				if err != nil {
-					return fmt.Errorf("failed to get digest for %v: %v", imgRef, err)
+					return fmt.Errorf("failed to get digest for %v: %v", newTagRef, err)
 				}
 				// We need to return the digest of the manifest, not the image. This is because the manifest is what is signed.
 				// This should return something like `gcr.io/istio-testing/pilot@sha256:1234`
-				if err := util.VerboseCommand("cosign", "sign", "--key", cosignkey, imgRef.Context().String()+"@"+digest.String(), "-y", "--recursive").Run(); err != nil {
+				if err := util.VerboseCommand("cosign", "sign", "--key", cosignkey, newTagRef.Context().String()+"@"+digest.String(), "-y", "--recursive").Run(); err != nil {
 					return fmt.Errorf("failed to sign image %v with key %v: %v", img.NewReference(arch), cosignkey, err)
 				}
 			}
 		} else {
-			digest, err := publishManifest(img, archs)
+			digest, err := publishManifest(img, archs, provenanceLabels)
 			if err != nil {
 				return err
 			}
@@ -175,8 +185,49 @@ func Docker(manifest model.Manifest, hub string, tags []string, cosignkey string
 	return nil
 }
 
+func getProvenanceLabels(manifest model.Manifest) map[string]string {
+	labels := map[string]string{}
+	if manifest.SourceGit != "" {
+		labels[ociSourceLabel] = manifest.SourceGit
+	} else if manifest.Dependencies.Istio != nil && manifest.Dependencies.Istio.Git != "" {
+		labels[ociSourceLabel] = manifest.Dependencies.Istio.Git
+	}
+
+	if manifest.Dependencies.Istio != nil {
+		if manifest.Dependencies.Istio.Sha != "" {
+			labels[ociRevisionLabel] = manifest.Dependencies.Istio.Sha
+		}
+	}
+
+	if manifest.SourceRefName != "" {
+		labels[ociRefNameLabel] = manifest.SourceRefName
+	} else if manifest.Dependencies.Istio != nil {
+		if ref := manifest.Dependencies.Istio.Ref(); ref != "" {
+			labels[ociRefNameLabel] = ref
+		}
+	}
+
+	return labels
+}
+
+func addProvenanceLabels(img v1.Image, labels map[string]string) (v1.Image, error) {
+	cfg, err := img.ConfigFile()
+	if err != nil {
+		return nil, err
+	}
+	if cfg.Config.Labels == nil {
+		cfg.Config.Labels = map[string]string{}
+	}
+	for key, value := range labels {
+		if value != "" {
+			cfg.Config.Labels[key] = value
+		}
+	}
+	return mutate.ConfigFile(img, cfg)
+}
+
 // publishManifest packages a single manifest for a multi-architecture image.
-func publishManifest(img Image, architectures []string) (string, error) {
+func publishManifest(img Image, architectures []string, labels map[string]string) (string, error) {
 	log.Infof("creating manifest %v for architectures %v", img, architectures)
 	// Typically we could just use `docker manifest create manifest images...`. However, we need to actually
 	// push source images first. We want to push these without a tag, so users never use them. Docker cannot
@@ -198,6 +249,10 @@ func publishManifest(img Image, architectures []string) (string, error) {
 		img, err := daemon.Image(origTagRef)
 		if err != nil {
 			return "", fmt.Errorf("failed to load %v: %v", origImage, err)
+		}
+		img, err = addProvenanceLabels(img, labels)
+		if err != nil {
+			return "", fmt.Errorf("failed to add provenance labels to %v: %v", origImage, err)
 		}
 		digest, err := img.Digest()
 		if err != nil {
